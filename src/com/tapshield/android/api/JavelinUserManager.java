@@ -296,11 +296,23 @@ public class JavelinUserManager {
 		params.add(new BasicNameValuePair(JavelinClient.PARAM_USERNAME, email));
 		params.add(new BasicNameValuePair(JavelinClient.PARAM_EMAIL, email));
 		params.add(new BasicNameValuePair(JavelinClient.PARAM_PASSWORD, password));
-		params.add(new BasicNameValuePair(JavelinClient.PARAM_PHONE, phoneNumber));
 		params.add(new BasicNameValuePair(JavelinClient.PARAM_CODE, disarmCode));
-		params.add(new BasicNameValuePair(JavelinClient.PARAM_FIRST_NAME, firstName));
-		params.add(new BasicNameValuePair(JavelinClient.PARAM_LAST_NAME, lastName));
-		params.add(new BasicNameValuePair(JavelinClient.PARAM_AGENCY, Integer.toString(agency.id)));
+
+		if (phoneNumber != null && phoneNumber.length() > 0) {
+			params.add(new BasicNameValuePair(JavelinClient.PARAM_PHONE, phoneNumber));
+		}
+		
+		if (agency != null) {
+			params.add(new BasicNameValuePair(JavelinClient.PARAM_AGENCY, Integer.toString(agency.id)));
+		}
+		
+		if (firstName != null && firstName.length() > 0) {
+			params.add(new BasicNameValuePair(JavelinClient.PARAM_FIRST_NAME, firstName));
+		}
+		
+		if (lastName != null && lastName.length() > 0) {
+			params.add(new BasicNameValuePair(JavelinClient.PARAM_LAST_NAME, lastName));
+		}
 		
 		JavelinComms.httpPost(
 				JavelinUtils.buildFinalUrl(mConfig, JavelinClient.URL_REGISTRATION),
@@ -809,7 +821,7 @@ public class JavelinUserManager {
 	}
 	
 	public void refreshCurrentAgency() {
-		if (!isPresent()) {
+		if (!isPresent() || !getUser().belongsToAgency()) {
 			return;
 		}
 

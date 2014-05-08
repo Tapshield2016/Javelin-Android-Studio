@@ -49,6 +49,8 @@ public class JavelinClient {
 	static final String URL_DISARM_SUFFIX = "disarm/";
 	static final String URL_VERIFICATION_CODE_REQUEST_SUFFIX = "send_sms_verification_code/";
 	static final String URL_VERIFICATION_CODE_CHECK_SUFFIX = "check_sms_verification_code/";
+	static final String URL_ENTOURAGE_MEMBERS = URL_API + API_VERSION_URL + "entourage-members/";
+	static final String URL_ENTOURAGE_MESSAGE = "message_entourage/";
 	
 	static final String URL_RESET_PASSWORD_SUFFIX = "accounts/password/reset/";
 	
@@ -116,6 +118,9 @@ public class JavelinClient {
 		return JavelinUserManager.getInstance(mContext, mConfig);
 	}
 	
+	public JavelinEntourageManager getEntourageManager() {
+		return JavelinEntourageManager.getInstance(mContext, mConfig);
+	}
 	
 	public void fetchAgencies(final OnAgenciesFetchListener l) {
 		

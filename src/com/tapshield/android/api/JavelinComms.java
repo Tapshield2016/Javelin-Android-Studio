@@ -10,6 +10,7 @@ import javax.net.ssl.HttpsURLConnection;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.Header;
 import org.apache.http.NameValuePair;
+import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
@@ -45,6 +46,12 @@ public class JavelinComms {
 	static void httpPatch(String url, String header, String headerContent, List<NameValuePair> paramList, final JavelinCommsCallback callback) {
 		String paramAll = buildParams(paramList, false);
 		new JavelinCommsRequest(callback).execute(url, header, headerContent, paramAll, HttpPatch.METHOD_NAME);
+	}
+	
+	//delete
+	static void httpDelete(String url, String header, String headerContent, final JavelinCommsCallback callback) {
+		String paramAll = buildParams(null, false);
+		new JavelinCommsRequest(callback).execute(url, header, headerContent, paramAll, HttpDelete.METHOD_NAME);
 	}
 	
 	private static String buildParams(List<NameValuePair> paramList, boolean urlEncode) {

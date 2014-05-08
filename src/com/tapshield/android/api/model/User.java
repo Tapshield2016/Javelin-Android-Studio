@@ -3,6 +3,8 @@ package com.tapshield.android.api.model;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import android.util.Log;
+
 import com.tapshield.android.api.JavelinUtils;
 
 public class User {
@@ -69,6 +71,10 @@ public class User {
 		return this.disarmCode;
 	}
 	
+	public boolean belongsToAgency() {
+		return agency != null;
+	}
+	
 	public boolean isPhoneNumberVerified() {
 		return phoneNumberVerified;
 	}
@@ -105,8 +111,15 @@ public class User {
 	
 	public static final User deserialize(String s) throws JSONException {
 		JSONObject o = new JSONObject(s);
+		
+		Log.i("aaa", "user deser=" + o.toString());
+		
 		User u = new User();
-		if(o.has(KEY_AGENCY)) u.agency = Agency.deserializeFromJson(o.getJSONObject(KEY_AGENCY));
+		
+		if(o.has(KEY_AGENCY) && !o.isNull(KEY_AGENCY)) {
+			u.agency = Agency.deserializeFromJson(o.getJSONObject(KEY_AGENCY));
+		}
+		
 		if (o.has(KEY_PROFILE)) {
 			u.profile = UserProfile.deserializeFromJson(o.getJSONObject(KEY_PROFILE));
 		}
@@ -119,9 +132,19 @@ public class User {
 		u.id = JavelinUtils.extractLastIntOfString(u.url);
 		u.username = o.getString(KEY_USERNAME);
 		u.email = o.getString(KEY_EMAIL);
-		u.firstName = o.getString(KEY_FIRST_NAME);
-		u.lastName = o.getString(KEY_LAST_NAME);
-		u.phoneNumber = o.getString(KEY_PHONE_NUMBER);
+		
+		if (o.has(KEY_FIRST_NAME)) {
+			u.firstName = o.getString(KEY_FIRST_NAME);
+		}
+		
+		if (o.has(KEY_LAST_NAME)) {
+			u.lastName = o.getString(KEY_LAST_NAME);
+		}
+		
+		if (o.has(KEY_PHONE_NUMBER)) {
+			u.phoneNumber = o.getString(KEY_PHONE_NUMBER);
+		}
+		
 		u.disarmCode = o.getString(KEY_DISARM_CODE);
 		u.phoneNumberVerified = o.getBoolean(KEY_PHONE_NUMBER_VERIFIED);
 		
