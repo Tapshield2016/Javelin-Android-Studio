@@ -489,11 +489,23 @@ public class JavelinUserManager {
 		
 		//this request specifically needs the numerical id of the agency instead of the url
 		List<NameValuePair> params = new ArrayList<NameValuePair>();
-		params.add(new BasicNameValuePair(JavelinClient.PARAM_AGENCY, Integer.toString(user.agency.id)));
-		params.add(new BasicNameValuePair(JavelinClient.PARAM_PHONE, user.phoneNumber));
 		params.add(new BasicNameValuePair(JavelinClient.PARAM_CODE, user.getDisarmCode()));
-		params.add(new BasicNameValuePair(JavelinClient.PARAM_FIRST_NAME, user.firstName));
-		params.add(new BasicNameValuePair(JavelinClient.PARAM_LAST_NAME, user.lastName));
+		
+		if (user.belongsToAgency()) {
+			params.add(new BasicNameValuePair(JavelinClient.PARAM_AGENCY, Integer.toString(user.agency.id)));
+		}
+		
+		if (user.phoneNumber != null && user.phoneNumber.length() > 0) {
+			params.add(new BasicNameValuePair(JavelinClient.PARAM_PHONE, user.phoneNumber));
+		}
+		
+		if (user.firstName != null && user.firstName.length() > 0) {
+			params.add(new BasicNameValuePair(JavelinClient.PARAM_FIRST_NAME, user.firstName));
+		}
+		
+		if (user.lastName != null && user.lastName.length() > 0) {
+			params.add(new BasicNameValuePair(JavelinClient.PARAM_LAST_NAME, user.lastName));
+		}
 		
 		JavelinComms.httpPost(
 				url,
@@ -501,7 +513,6 @@ public class JavelinUserManager {
 				JavelinClient.HEADER_VALUE_TOKEN_PREFIX + getApiToken(),
 				params,
 				callback);
-				
 	}
 	
 	
