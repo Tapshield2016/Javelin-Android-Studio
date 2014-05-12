@@ -588,7 +588,7 @@ public class JavelinUserManager {
 		
 		String url = JavelinUtils.buildFinalUrl(mConfig, JavelinClient.URL_PROFILES);
 		
-		List<NameValuePair> params = new ArrayList<NameValuePair>();
+		List<NameValuePair> params = user.profile.getAvailableRequestParams();
 		params.add(new BasicNameValuePair(JavelinClient.PARAM_PROFILE_USER, user.url));
 		
 		JavelinComms.httpPost(
