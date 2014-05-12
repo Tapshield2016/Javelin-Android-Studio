@@ -813,6 +813,12 @@ public class JavelinUserManager {
 				
 				l.onNewPhoneNumberVerificationSmsCodeVerified(response.successful, reason);
 				
+				if (response.successful) {
+					User user = getUser();
+					user.setPhoneNumberVerified();
+					setUser(user);
+				}
+				
 				Log.i("javelin", "Phone verification success=" + response.successful
 						+ " response=" + response.jsonResponse.toString());
 			}
