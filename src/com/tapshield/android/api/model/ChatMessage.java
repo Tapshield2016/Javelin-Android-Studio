@@ -1,11 +1,9 @@
 package com.tapshield.android.api.model;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
-import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -38,7 +36,7 @@ public class ChatMessage {
 		this.message = message;
 		this.senderName = senderName;
 		this.senderId = senderId;
-		this.timestamp = getCurrentUTC();
+		this.timestamp = getCurrentUTCSeconds();
 	}
 	
 	public ChatMessage(String message, String senderName, String senderId, long timestamp) {
@@ -46,9 +44,8 @@ public class ChatMessage {
 		this.timestamp = timestamp;
 	}
 	
-	private long getCurrentUTC() {
-		long local = System.currentTimeMillis();
-		long utc = DateTimeZone.getDefault().convertLocalToUTC(local, false);
+	private long getCurrentUTCSeconds() {
+		long utc = System.currentTimeMillis();
 		return utc/1000;
 	}
 	
@@ -66,6 +63,8 @@ public class ChatMessage {
 			o.put(KEY_SENDERNAME, m.senderName);
 			o.put(KEY_TRANSMITTING, m.transmitting);
 			o.put(KEY_TIMESTAMP, m.timestamp);
+			
+			
 		} catch (Exception e) {
 			Log.e("javelin", "Error serializing ChatMessage.");
 		}
