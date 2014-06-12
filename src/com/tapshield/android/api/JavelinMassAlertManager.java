@@ -160,6 +160,10 @@ public class JavelinMassAlertManager {
 
 		JavelinUserManager userManager = JavelinUserManager.getInstance(mContext, mConfig);
 
+		if (userManager.getUser().agency == null) {
+			return;
+		}
+		
 		List<NameValuePair> params = new ArrayList<NameValuePair>();
 		params.add(
 				new BasicNameValuePair(

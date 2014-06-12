@@ -2,45 +2,48 @@ package com.tapshield.android.api;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 
 import android.content.Context;
-import android.util.Log;
 
+import com.google.gson.Gson;
 import com.tapshield.android.api.JavelinComms.JavelinCommsCallback;
 import com.tapshield.android.api.JavelinComms.JavelinCommsRequestResponse;
+import com.tapshield.android.api.model.SocialCrime;
+import com.tapshield.android.api.model.SocialCrime.SocialCrimes;
 
 public class JavelinSocialReportingManager {
 
-	//commented out unsupported types due to lack of icons
+	//commented out unsupported types
 	public static final String[] TYPE_LIST = new String[] {
-			//"Abuse",
+			"Abuse",
 			"Assault",
 			"Car Accident",
-			//"Disturbance",
+			"Disturbance",
 			"Drugs",
-			"Harrasment",
+			"Harassment",
 			"Mental Health",
 			"Other",
 			//"Repair Needed",
-			//"Suggestion",
+			"Suggestion",
 			"Suspicious Activity",
 			"Theft",
 			"Vandalism"};
 	
 	private static final String[] TYPE_CODES = new String[] {
-			//"AB",
+			"AB",
 			"AS",
 			"CA",
-			//"DI",
+			"DI",
 			"DR",
 			"H",
 			"MH",
 			"O",
 			//"RN",
-			//"S",
+			"S",
 			"SA",
 			"T",
 			"V"};
@@ -50,6 +53,13 @@ public class JavelinSocialReportingManager {
 	private static final String PARAM_TYPE = "report_type";
 	private static final String PARAM_LATITUDE = "report_latitude";
 	private static final String PARAM_LONGITUDE = "report_longitude";
+	private static final String PARAM_ANONYMOUSLY = "report_anonymous";
+	private static final String PARAM_MEDIA_AUDIO = "report_audio_url";
+	private static final String PARAM_MEDIA_IMAGE = "report_image_url";
+	private static final String PARAM_MEDIA_VIDEO = "report_video_url";
+	private static final String PARAM_GET_LATITUDE = "latitude";
+	private static final String PARAM_GET_LONGITUDE = "longitude";
+	private static final String PARAM_GET_DISTANCE = "distance_within";
 	
 	private static JavelinSocialReportingManager mInstance;
 	private Context mContext;
@@ -68,7 +78,9 @@ public class JavelinSocialReportingManager {
 	}
 	
 	public void report(final String body, final String reportTypeName,
-			final String latitude, final String longitude, final SocialReportingListener l) {
+			final String latitude, final String longitude, boolean anonymous,
+			final SocialReportingListener l, String mediaUrlAudio, String mediaUrlImage,
+			String mediaUrlVideo) {
 		
 		final String typeCode = getCodeByType(reportTypeName);
 		
@@ -76,7 +88,6 @@ public class JavelinSocialReportingManager {
 			
 			@Override
 			public void onEnd(JavelinCommsRequestResponse response) {
-				Log.i("aaa", "report status=" + response.response);
 				l.onReport(response.successful, response.code, response.exception.getMessage());
 			}
 		};
@@ -89,12 +100,27 @@ public class JavelinSocialReportingManager {
 		final String reporter = userManager.getUser().url;
 		final String userToken = userManager.getApiToken();
 		
+		final String verifiedBody = (body == null || body.isEmpty()) ? " " : body;
+		
 		final List<NameValuePair> params = new ArrayList<NameValuePair>();
 		params.add(new BasicNameValuePair(PARAM_REPORTER, reporter));
-		params.add(new BasicNameValuePair(PARAM_BODY, body));
+		params.add(new BasicNameValuePair(PARAM_BODY, verifiedBody));
 		params.add(new BasicNameValuePair(PARAM_TYPE, typeCode));
 		params.add(new BasicNameValuePair(PARAM_LATITUDE, latitude));
 		params.add(new BasicNameValuePair(PARAM_LONGITUDE, longitude));
+		params.add(new BasicNameValuePair(PARAM_ANONYMOUSLY, Boolean.toString(anonymous)));
+		
+		if (mediaUrlAudio != null) {
+			params.add(new BasicNameValuePair(PARAM_MEDIA_AUDIO, mediaUrlAudio));
+		}
+		
+		if (mediaUrlImage != null) {
+			params.add(new BasicNameValuePair(PARAM_MEDIA_IMAGE, mediaUrlImage));
+		}
+		
+		if (mediaUrlVideo != null) {
+			params.add(new BasicNameValuePair(PARAM_MEDIA_VIDEO, mediaUrlVideo));
+		}
 		
 		JavelinComms.httpPost(
 				url,
@@ -104,13 +130,80 @@ public class JavelinSocialReportingManager {
 				callback);
 	}
 	
-	private String getCodeByType(String type) {
+	public void details(final SocialCrime socialCrime, final SocialReportingListener l) {
+		details(socialCrime.getUrl(), l);
+	}
+	
+	public void details(final String url, final SocialReportingListener l) {
+		final JavelinUserManager userManager  =
+				JavelinClient
+				.getInstance(mContext, mConfig)
+				.getUserManager();
+		
+		final String userToken = userManager.getApiToken();
+		
+		JavelinCommsCallback callback = new JavelinCommsCallback() {
+			
+			@Override
+			public void onEnd(JavelinCommsRequestResponse response) {
+				
+				l.onDetails(response.successful, response.code,
+						new Gson().fromJson(response.response, SocialCrime.class),
+						response.exception.getMessage());
+			}
+		};
+		
+		JavelinComms.httpGet(
+				url,
+				JavelinClient.HEADER_AUTH,
+				JavelinClient.HEADER_VALUE_TOKEN_PREFIX + userToken,
+				null,
+				callback);
+	}
+	
+	public void getReportsAt(final double latitude, final double longitude,
+			final float radiusInMiles, final SocialReportingListener l) {
+		
+		JavelinCommsCallback callback = new JavelinCommsCallback() {
+			
+			@Override
+			public void onEnd(JavelinCommsRequestResponse response) {
+				
+				l.onFetch(response.successful, response.code,
+						new Gson().fromJson(response.response, SocialCrimes.class),
+						response.exception.getMessage());
+			}
+		};
+		
+		final List<NameValuePair> params = new ArrayList<NameValuePair>();
+		params.add(new BasicNameValuePair(PARAM_GET_LATITUDE, Double.toString(latitude)));
+		params.add(new BasicNameValuePair(PARAM_GET_LONGITUDE, Double.toString(longitude)));
+		params.add(new BasicNameValuePair(PARAM_GET_DISTANCE, Float.toString(radiusInMiles)));
+		
+		final String url = mConfig.getBaseUrl() + JavelinClient.URL_REPORT_SOCIAL;
+		final JavelinUserManager userManager  =
+				JavelinClient
+				.getInstance(mContext, mConfig)
+				.getUserManager();
+		
+		final String userToken = userManager.getApiToken();
+		
+		JavelinComms.httpGet(
+				url,
+				JavelinClient.HEADER_AUTH,
+				JavelinClient.HEADER_VALUE_TOKEN_PREFIX + userToken,
+				params,
+				callback);
+	}
+	
+	public static String getCodeByType(String type) {
 		String code = TYPE_CODES[0];
 		
 		for (int i = 0; i < TYPE_LIST.length; i++) {
 			String innerType = TYPE_LIST[i];
 			
-			if (innerType.toLowerCase().trim().equals(type.toLowerCase().trim())) {
+			if (innerType.toLowerCase(Locale.getDefault()).trim()
+					.equals(type.toLowerCase(Locale.getDefault()).trim())) {
 				code = TYPE_CODES[i];
 				break;
 			}
@@ -119,7 +212,25 @@ public class JavelinSocialReportingManager {
 		return code;
 	}
 	
+	public static String getTypeByCode(String typeCode) {
+		String type = TYPE_LIST[0];
+		
+		for (int i = 0; i < TYPE_CODES.length; i++) {
+			String innerCode = TYPE_CODES[i];
+			
+			if (innerCode.toLowerCase(Locale.getDefault()).trim()
+					.equals(typeCode.toLowerCase(Locale.getDefault()).trim())) {
+				type = TYPE_LIST[i];
+				break;
+			}
+		}
+		
+		return type;
+	}
+	
 	public interface SocialReportingListener {
 		void onReport(boolean ok, int code, String errorIfNotOk);
+		void onFetch(boolean ok, int code, SocialCrimes socialCrimes, String errorIfNotOk);
+		void onDetails(boolean ok, int code, SocialCrime socialCrime, String errorIfNotOk);
 	}
 }

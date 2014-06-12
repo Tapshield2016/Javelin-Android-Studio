@@ -28,6 +28,9 @@ public class Agency {
 	private static String KEY_DISPLAY_COMMANDALERT = "display_command_alert";
 	private static String KEY_REQUIRED_DOMAIN_EMAIL = "require_domain_emails";
 	private static String KEY_SHOW_AGENCY_NAME = "show_agency_name_in_app_navbar";
+	private static String KEY_INFO_URL = "agency_info_url";
+	private static String KEY_RSS_URL = "agency_rss_url";
+	private static String KEY_THEME = "agency_theme";
 	
 	private static String KEY_LIST = "results";
 	
@@ -41,7 +44,10 @@ public class Agency {
 			secondaryNumber,
 			scheduleStart,
 			scheduleEnd,
-			completeMessage;
+			completeMessage,
+			infoUrl,
+			rssUrl,
+			themeJsonString;
 	public boolean
 			displayCommandAlert,
 			requiredDomainEmails,
@@ -100,6 +106,9 @@ public class Agency {
 			o.put(KEY_DISPLAY_COMMANDALERT, a.displayCommandAlert);
 			o.put(KEY_REQUIRED_DOMAIN_EMAIL, a.requiredDomainEmails);
 			o.put(KEY_SHOW_AGENCY_NAME, a.showAgencyName);
+			o.put(KEY_INFO_URL, a.infoUrl);
+			o.put(KEY_RSS_URL, a.rssUrl);
+			o.put(KEY_THEME, a.themeJsonString);
 			
 			JSONArray list = new JSONArray();
 			for (String coordinates : a.boundaries) {
@@ -154,6 +163,15 @@ public class Agency {
 			a.displayCommandAlert = o.getBoolean(KEY_DISPLAY_COMMANDALERT);
 			a.requiredDomainEmails = o.getBoolean(KEY_REQUIRED_DOMAIN_EMAIL);
 			a.showAgencyName = o.getBoolean(KEY_SHOW_AGENCY_NAME);
+			a.themeJsonString = o.getString(KEY_THEME);
+			
+			if (!o.isNull(KEY_INFO_URL)) {
+				a.infoUrl = o.getString(KEY_INFO_URL);
+			}
+			
+			if (!o.isNull(KEY_RSS_URL)) {
+				a.rssUrl = o.getString(KEY_RSS_URL);
+			}
 			
 			List<String> boundaries = new ArrayList<String>();
 			

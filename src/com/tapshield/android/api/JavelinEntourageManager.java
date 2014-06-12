@@ -5,6 +5,8 @@ import java.util.List;
 
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import android.content.Context;
 import android.util.Log;
@@ -20,6 +22,7 @@ public class JavelinEntourageManager {
 	private static final String PARAM_PHONE = "phone_number";
 	private static final String PARAM_EMAIL = "email_address";
 	private static final String PARAM_MESSAGE = "message";
+	private static final String PARAM_MEMBERS = "entourage_members";
 	
 	private static JavelinEntourageManager mInstance;
 	private Context mContext;
@@ -76,13 +79,21 @@ public class JavelinEntourageManager {
 			@Override
 			public void onEnd(JavelinCommsRequestResponse response) {
 				Log.i("aaa", "entourage add success=" + response.successful);
+				
+				int memberId = -1;
+				
 				if (response.successful) {
 					Log.i("aaa", response.response);
+					try {
+						JSONObject o = new JSONObject(response.response);
+						String url = o.getString("url");
+						memberId = JavelinUtils.extractLastIntOfString(url);
+					} catch (Exception e) {}
 				} else {
 					Log.i("aaa", response.exception.getMessage());
 				}
-				//int memberId = Integer.parseInt(response.response);
-				//l.onMemberAdded(response.successful, memberId, response.exception.getMessage());
+				
+				l.onMemberAdded(response.successful, memberId, response.exception.getMessage());
 			}
 		};
 		
@@ -137,7 +148,7 @@ public class JavelinEntourageManager {
 			@Override
 			public void onEnd(JavelinCommsRequestResponse response) {
 				Log.i("aaa", "entourage message success=" + response.successful + " response=" + response.response);
-				l.onMessage(response.successful, response.response, response.exception.getMessage());
+				l.onMembersMessage(response.successful, response.response, response.exception.getMessage());
 			}
 		};
 		
@@ -149,12 +160,54 @@ public class JavelinEntourageManager {
 				JavelinClient.HEADER_AUTH,
 				JavelinClient.HEADER_VALUE_TOKEN_PREFIX + token,
 				params,
-				callback);		
+				callback);
+	}
+	
+	public void fetchMembers(final EntourageListener l) {
+		
+		JavelinCommsCallback callback = new JavelinCommsCallback() {
+			
+			@Override
+			public void onEnd(JavelinCommsRequestResponse response) {
+				
+				boolean ok = response.successful;
+				String message = null;
+				String error = null;
+				
+				if (response.successful) {
+					try {
+						message = response.response;
+					} catch (Exception e) {
+						ok = false;
+						message = null;
+						error = e.getMessage();
+					}
+				} else {
+					error = response.exception.getMessage();
+				}
+				
+				l.onMembersFetch(ok, message, error);
+			}
+		};
+		
+		JavelinUserManager userManager = JavelinClient.getInstance(mContext, mConfig)
+				.getUserManager();
+		
+		String userUrl = userManager.getUser().url;
+		String token = userManager.getApiToken();
+		
+		JavelinComms.httpGet(
+				userUrl,
+				JavelinClient.HEADER_AUTH,
+				JavelinClient.HEADER_VALUE_TOKEN_PREFIX + token,
+				null,
+				callback);
 	}
 	
 	public interface EntourageListener {
 		void onMemberAdded(boolean ok, int memberId, String errorIfNotOk);
 		void onMemberRemoved(boolean ok, int memberId, String errorIfNotOk);
-		void onMessage(boolean ok, String message, String errorIfNotOk);
+		void onMembersMessage(boolean ok, String message, String errorIfNotOk);
+		void onMembersFetch(boolean ok, String message, String errorIfNotOk);
 	}
 }

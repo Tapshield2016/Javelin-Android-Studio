@@ -13,13 +13,23 @@ import org.json.JSONObject;
 
 import android.content.ContentResolver;
 import android.content.Context;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.net.Uri;
+import android.provider.OpenableColumns;
 import android.util.Base64;
 import android.util.Log;
+import android.webkit.MimeTypeMap;
 
+import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.event.ProgressEvent;
+import com.amazonaws.event.ProgressListener;
+import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.model.CannedAccessControlList;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.tapshield.android.api.model.User;
 
 public class JavelinUtils {
@@ -180,5 +190,78 @@ public class JavelinUtils {
 			return false;
 		}
 		return true;
+	}
+	
+	public static final String syncUploadFileToS3WithUri(Context context, JavelinConfig config,
+			final Uri uri, final S3UploadListener l) {
+		String url = null;
+
+		if (context == null || config == null || uri == null) {
+			return url;
+		}
+		
+		//first obtain all necessary information of the file
+		ContentResolver contentResolver = context.getContentResolver();
+		
+		String[] fileInfo = {OpenableColumns.SIZE};
+		
+		Cursor cursor = contentResolver.query(uri, fileInfo, null, null, null);
+		
+		if (cursor == null || !cursor.moveToFirst()) {
+			return url;
+		}
+		
+		int sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE);
+		
+		final Long size = cursor.isNull(sizeIndex) ? null : cursor.getLong(sizeIndex);
+		
+		ObjectMetadata metadata = new ObjectMetadata();
+		metadata.setContentType(contentResolver.getType(uri));
+		
+		if (size != null) {
+			metadata.setContentLength(size);
+		}
+		
+		cursor.close();
+		
+		//now build and make the s3 request
+		String bucketName = config.getAwsS3Bucket();
+		String extension = MimeTypeMap
+				.getSingleton()
+				.getExtensionFromMimeType(contentResolver.getType(uri));
+		final String key = UUID.randomUUID().toString() + "." + extension;
+		
+		url = "http://" + bucketName + ".s3.amazonaws.com/" + key;
+		
+		final AmazonS3Client s3Client = new AmazonS3Client(
+				new BasicAWSCredentials(config.getAwsS3AccessKey(), config.getAwsS3SecretKey()));
+
+		try {
+			PutObjectRequest request = new PutObjectRequest(bucketName, key,
+					contentResolver.openInputStream(uri), metadata);
+			request.setGeneralProgressListener(new ProgressListener() {
+				
+				@Override
+				public void progressChanged(ProgressEvent progressEvent) {
+					if (l != null) {
+						l.onUploading(uri, progressEvent.getBytesTransferred(), (long) size);
+					}
+				}
+			});
+			request.setCannedAcl(CannedAccessControlList.PublicRead);
+			s3Client.putObject(request);
+		} catch (Exception e) {
+			if (l != null) {
+				l.onError(uri, e.getMessage());
+			}
+			url = null;
+			return url;
+		}
+		return url;
+	}
+	
+	public interface S3UploadListener {
+		void onUploading(Uri uri, long newBytesTransferred, long total);
+		void onError(Uri uri, String error);
 	}
 }
