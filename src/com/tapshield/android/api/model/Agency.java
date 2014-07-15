@@ -10,6 +10,7 @@ import org.json.JSONObject;
 import android.location.Location;
 import android.util.Log;
 
+import com.google.gson.Gson;
 import com.tapshield.android.api.JavelinUtils;
 
 public class Agency {
@@ -23,13 +24,20 @@ public class Agency {
 	private static String KEY_NUMBER_SECONDARY = "dispatcher_secondary_phone_number";
 	private static String KEY_SCHEDULE_START = "dispatcher_schedule_start";
 	private static String KEY_SCHEDULE_END = "dispatcher_schedule_end";
+	private static String KEY_CENTER_LATITUDE = "agency_center_latitude";
+	private static String KEY_CENTER_LONGITUDE = "agency_center_longitude";
 	private static String KEY_BOUNDARIES = "agency_boundaries";
+	private static String KEY_DISPATCH_CENTERS = "dispatch_center";
+	private static String KEY_REGIONS = "region";
 	private static String KEY_COMPLETE_MESSAGE = "alert_completed_message";
 	private static String KEY_DISPLAY_COMMANDALERT = "display_command_alert";
 	private static String KEY_REQUIRED_DOMAIN_EMAIL = "require_domain_emails";
 	private static String KEY_SHOW_AGENCY_NAME = "show_agency_name_in_app_navbar";
 	private static String KEY_INFO_URL = "agency_info_url";
 	private static String KEY_RSS_URL = "agency_rss_url";
+	private static String KEY_LOGO = "agency_logo";
+	private static String KEY_LOGO_ALTERNATE = "agency_alternate_logo";
+	private static String KEY_LOGO_SMALL = "agency_small_logo";
 	private static String KEY_THEME = "agency_theme";
 	
 	private static String KEY_LIST = "results";
@@ -47,6 +55,9 @@ public class Agency {
 			completeMessage,
 			infoUrl,
 			rssUrl,
+			logo,
+			logoAlternate,
+			logoSmall,
 			themeJsonString;
 	public boolean
 			displayCommandAlert,
@@ -54,8 +65,15 @@ public class Agency {
 			showAgencyName = false;
 	public float
 			distance = Float.MAX_VALUE;
+	public double
+			centerLatitude,
+			centerLongitude;
 	private List<String>
 			boundaries;
+	public List<DispatchCenter>
+			dispatchCenters;
+	public List<Region>
+			regions;
 	
 	public Agency() {}
 	
@@ -87,6 +105,40 @@ public class Agency {
 		return b;
 	}
 	
+	public boolean hasRegions() {
+		return regions != null && !regions.isEmpty();
+	}
+	
+	public static List<Location> getBoundariesOfRegion(Region r) {
+		List<Location> b = new ArrayList<Location>();
+		
+		if (r == null || r.mBoundaries == null || r.mBoundaries.isEmpty()) {
+			return b;
+		}
+		
+		try {
+			JSONArray points = new JSONArray(r.mBoundaries);
+			
+			for (int i = 0; i < points.length(); i++) {
+				String point = points.getString(i);
+				String[] degrees = point.split(",");
+				String lat = degrees[0];
+				String lon = degrees[1];
+				
+				Location l = new Location("");
+				l.setLatitude(Double.parseDouble(lat));
+				l.setLongitude(Double.parseDouble(lon));
+				
+				b.add(l);
+			}
+		} catch (Exception e) {
+			Log.e("javelin", "Error retrieving boundaries of static region:", e);
+			b.clear();
+		}
+		
+		return b;
+	}
+	
 	public static final String serializeToString(Agency a) {
 		return serializeToJson(a).toString();
 	}
@@ -108,7 +160,12 @@ public class Agency {
 			o.put(KEY_SHOW_AGENCY_NAME, a.showAgencyName);
 			o.put(KEY_INFO_URL, a.infoUrl);
 			o.put(KEY_RSS_URL, a.rssUrl);
+			o.put(KEY_LOGO, a.logo);
+			o.put(KEY_LOGO_ALTERNATE, a.logoAlternate);
+			o.put(KEY_LOGO_SMALL, a.logoSmall);
 			o.put(KEY_THEME, a.themeJsonString);
+			o.put(KEY_CENTER_LATITUDE, a.centerLatitude);
+			o.put(KEY_CENTER_LONGITUDE, a.centerLongitude);
 			
 			JSONArray list = new JSONArray();
 			for (String coordinates : a.boundaries) {
@@ -118,6 +175,35 @@ public class Agency {
 			if (list.length() > 0) {
 				o.put(KEY_BOUNDARIES, list.toString());
 				Log.d("javelin", "plugged boundaries=" + list.toString());
+			}
+			
+			//additions for multiple geofences and dispatch centers
+			
+			Gson gson = new Gson();
+			
+			if (a.dispatchCenters != null && !a.dispatchCenters.isEmpty()) {
+				
+				JSONArray centers = new JSONArray();
+				
+				for (DispatchCenter center : a.dispatchCenters) {
+					centers.put(
+							new JSONObject(
+									gson.toJson(center)));
+				}
+				
+				o.put(KEY_DISPATCH_CENTERS, centers);
+			}
+			
+			if (a.regions != null && !a.regions.isEmpty()) {
+				JSONArray regions = new JSONArray();
+				
+				for (Region region : a.regions) {
+					regions.put(
+							new JSONObject(
+									gson.toJson(region)));
+				}
+				
+				o.put(KEY_REGIONS, regions);
 			}
 			
 		} catch (Exception e) {
@@ -164,6 +250,11 @@ public class Agency {
 			a.requiredDomainEmails = o.getBoolean(KEY_REQUIRED_DOMAIN_EMAIL);
 			a.showAgencyName = o.getBoolean(KEY_SHOW_AGENCY_NAME);
 			a.themeJsonString = o.getString(KEY_THEME);
+			a.logo = o.getString(KEY_LOGO);
+			a.logoAlternate = o.getString(KEY_LOGO_ALTERNATE);
+			a.logoSmall = o.getString(KEY_LOGO_SMALL);
+			a.centerLatitude = o.getDouble(KEY_CENTER_LATITUDE);
+			a.centerLongitude = o.getDouble(KEY_CENTER_LONGITUDE);
 			
 			if (!o.isNull(KEY_INFO_URL)) {
 				a.infoUrl = o.getString(KEY_INFO_URL);
@@ -192,6 +283,38 @@ public class Agency {
 				}
 			} else {
 				a.boundaries = boundaries;
+			}
+			
+			//additions for multiple geofences and dispatch centers
+			
+			Gson gson = new Gson();
+			
+			if (o.has(KEY_DISPATCH_CENTERS) && !o.isNull(KEY_DISPATCH_CENTERS)) {
+				JSONArray centers = o.getJSONArray(KEY_DISPATCH_CENTERS);
+				
+				if (centers.length() > 0) {
+					a.dispatchCenters = new ArrayList<DispatchCenter>();
+					
+					for (int i = 0; i < centers.length(); i++) {
+						JSONObject center = centers.getJSONObject(i);
+						a.dispatchCenters.add(
+								gson.fromJson(center.toString(), DispatchCenter.class));
+					}
+				}
+			}
+			
+			if (o.has(KEY_REGIONS) && !o.isNull(KEY_REGIONS)) {
+				JSONArray regions = o.getJSONArray(KEY_REGIONS);
+				
+				if (regions.length() > 0) {
+					a.regions = new ArrayList<Region>();
+					
+					for (int i = 0; i < regions.length(); i++) {
+						JSONObject region = regions.getJSONObject(i);
+						a.regions.add(
+								gson.fromJson(region.toString(), Region.class));
+					}
+				}
 			}
 			
 		} catch (Exception e) {

@@ -162,6 +162,7 @@ public class JavelinComms {
 				}
 				
 				if (is != null) {
+					response.inputStream = is;
 					response.response = IOUtils.toString(is);
 				} else {
 					response.response = new String();
@@ -201,5 +202,6 @@ public class JavelinComms {
 		public String response = null;
 		public Exception exception = null;
 		public JSONObject jsonResponse;
+		public InputStream inputStream;
 	}
 }

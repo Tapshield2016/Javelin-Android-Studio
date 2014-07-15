@@ -10,18 +10,21 @@ import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.util.Log;
 
+import com.amazonaws.AmazonClientException;
 import com.amazonaws.Request;
+import com.amazonaws.Response;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.handlers.RequestHandler;
+import com.amazonaws.handlers.RequestHandler2;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.ComparisonOperator;
 import com.amazonaws.services.dynamodbv2.model.Condition;
 import com.amazonaws.services.dynamodbv2.model.PutItemRequest;
+import com.amazonaws.services.dynamodbv2.model.PutItemResult;
 import com.amazonaws.services.dynamodbv2.model.QueryRequest;
 import com.amazonaws.services.dynamodbv2.model.QueryResult;
-import com.amazonaws.util.TimingInfo;
+import com.amazonaws.services.dynamodbv2.model.ReturnValue;
 import com.tapshield.android.api.model.ChatMessage;
 
 public class JavelinChatManager {
@@ -141,6 +144,7 @@ public class JavelinChatManager {
 
 		Log.i("javelin", "sendpendingmessages: alertid=" + mAlertId + " queue.size=" + mOutbox.size() + " queue.index=" + mOutboxIndex);
 		
+		/*
 		final RequestHandler handler = new RequestHandler() {
 
 			@Override
@@ -158,8 +162,9 @@ public class JavelinChatManager {
 				Log.e("javelin", "sendpendingmessages @ after error:" + request + " -- " + e);
 			}
 		};
+		*/
 		
-		new ChatMessageDeliveryAsync().execute(handler);
+		new ChatMessageDeliveryAsync().execute();
 	}
 	
 	private void addBasedOnTimestamp(ChatMessage m) {
@@ -373,18 +378,14 @@ public class JavelinChatManager {
 		}
 	}
 	
-	private class ChatMessageDeliveryAsync extends AsyncTask<RequestHandler, Void, Void> {
+	private class ChatMessageDeliveryAsync extends AsyncTask<Void, Void, Void> {
 
 		@Override
-		protected Void doInBackground(RequestHandler... handlers) {
-			
-			RequestHandler handler = handlers[0];
-
-			mDdb.addRequestHandler(handler);
+		protected Void doInBackground(Void... args) {
 			
 			for (int indexToSend = mOutboxIndex; indexToSend < mOutbox.size(); indexToSend++) {
 				
-				ChatMessage chatMessage = mOutbox.get(indexToSend);
+				final ChatMessage chatMessage = mOutbox.get(indexToSend);
 
 				Log.i("javelin", "sending pending message async " + indexToSend + "/" + (mOutbox.size()-1));
 				Log.i("javelin", "  id=" + chatMessage.id + " message=" + chatMessage.message + " ");
@@ -392,7 +393,7 @@ public class JavelinChatManager {
 				chatMessage.alertId = mAlertId;
 				int numericalId = JavelinUtils.extractLastIntOfString(chatMessage.alertId);
 				
-				AttributeValue
+				final AttributeValue
 						message = new AttributeValue().withS(chatMessage.message),
 						messageId = new AttributeValue().withS(chatMessage.id),
 						alertId = new AttributeValue().withN(Integer.toString(numericalId)),
@@ -408,11 +409,22 @@ public class JavelinChatManager {
 
 				PutItemRequest insertion = new PutItemRequest()
 						.withTableName(mConfig.getAwsDynamoDbTable())
-						.withItem(item);
+						.withItem(item)
+						.withReturnValues(ReturnValue.ALL_OLD);
 				
-				mDdb.putItem(insertion);
-				
-				mOutboxIndex++;
+				try {
+					Log.i("aaa", "pre-put with item=" + insertion.getItem().toString());
+					mDdb.putItem(insertion);
+					Log.i("aaa", "resultMessageId=" + chatMessage.id);
+					completeDeliveryOf(chatMessage.id);
+				} catch (AmazonClientException e) {
+					Log.e("javelin", "Error sending message.", e);
+					
+					if (JavelinAlertManager.getInstance(mContext, mConfig).isRunning()) {
+						Log.i("javelin", "Retrying...");
+						sendPendingMessages();
+					}
+				}
 			}
 			
 			return null;

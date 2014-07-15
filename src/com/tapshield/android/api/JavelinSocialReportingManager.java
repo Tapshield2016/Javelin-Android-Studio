@@ -8,6 +8,7 @@ import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 
 import android.content.Context;
+import android.util.Log;
 
 import com.google.gson.Gson;
 import com.tapshield.android.api.JavelinComms.JavelinCommsCallback;
@@ -164,14 +165,38 @@ public class JavelinSocialReportingManager {
 	public void getReportsAt(final double latitude, final double longitude,
 			final float radiusInMiles, final SocialReportingListener l) {
 		
-		JavelinCommsCallback callback = new JavelinCommsCallback() {
+		final JavelinCommsCallback callback = new JavelinCommsCallback() {
 			
 			@Override
 			public void onEnd(JavelinCommsRequestResponse response) {
 				
-				l.onFetch(response.successful, response.code,
-						new Gson().fromJson(response.response, SocialCrimes.class),
-						response.exception.getMessage());
+				if (l == null) {
+					Log.e("aaa", "social reporting listener is null");
+					return;
+				}
+				
+				final boolean ok = response.successful;
+				final int code = response.code;
+				
+				Log.i("aaa", "Social report response");
+				Log.i("aaa", "   success=" + ok);
+				Log.i("aaa", "   response=" + response.response);
+				
+				if (ok) {
+					SocialCrimes crimes = null;
+					try {
+						crimes = new Gson().fromJson(response.response, SocialCrimes.class);
+					} catch (Exception e) {
+						Log.i("aaa", " successful BUT " + e.getMessage());
+						l.onFetch(ok, code, null, "Successful BUT " + e.getMessage());
+					}
+					
+					if (crimes != null) {
+						l.onFetch(ok, code, crimes, null);
+					}
+				} else {
+					l.onFetch(ok, code, null, response.exception.getMessage());
+				}
 			}
 		};
 		

@@ -10,6 +10,7 @@ import java.util.UUID;
 
 import javax.net.ssl.HttpsURLConnection;
 
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.Header;
 import org.apache.http.NameValuePair;
@@ -21,6 +22,8 @@ import org.json.JSONObject;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
 import android.util.Log;
 
@@ -38,6 +41,7 @@ import com.tapshield.android.api.model.UserProfile;
 public class JavelinUserManager {
 
 	public static final String ACTION_AGENCY_REFRESHED = "com.tapshield.android.action.AGENCY_REFRESHED";
+	public static final String ACTION_AGENCY_LOGOS_UPDATED = "com.tapshield.android.action.AGENCY_LOGOS_UPDATED";
 	
 	public static final int CODE_OK = 1;
 	public static final int CODE_ERROR_WRONG_CREDENTIALS = 2;
@@ -862,6 +866,7 @@ public class JavelinUserManager {
 					Intent broadcast = new Intent(ACTION_AGENCY_REFRESHED);
 					mContext.sendBroadcast(broadcast);
 					
+					updateAgencyLogos();
 				} else {
 					Log.e("javelin", "Error refreshing current agency", e);
 				}
@@ -870,6 +875,59 @@ public class JavelinUserManager {
 		
 		String url = getUser().agency.url;
 		getAgencyWithUrl(url, l);
+	}
+	
+	private void updateAgencyLogos() {
+		String logoUrl = getUser().agency.logoAlternate;
+		
+		if (logoUrl == null || logoUrl.isEmpty()) {
+			return;
+		}
+		
+		String logoName = FilenameUtils.getName(logoUrl);
+		
+		File directory = getLogosDirectory();
+		File logo = new File(directory, logoName);
+		
+		if (logo.exists()) {
+			return;
+		}
+		
+		if (!directory.exists()) {
+			directory.mkdir();
+		}
+		
+		//delete all other files to avoid collecting older files
+		for (File f : directory.listFiles()) {
+			f.delete();
+		}
+		
+		new JavelinUtils.AsyncImageDownloaderToFile(mContext, logoUrl, logo,
+				ACTION_AGENCY_LOGOS_UPDATED, false).execute();
+	}
+	
+	private File getLogosDirectory() {
+		return new File(mContext.getExternalFilesDir(null).getAbsoluteFile() + "/logos");
+	}
+	
+	public boolean hasAlternateLogo() {
+		File dir = getLogosDirectory();
+		
+		if (!dir.exists()) {
+			return false;
+		}
+		
+		return dir.list().length > 0;
+	}
+	
+	public Bitmap getAlternateLogo() {
+		if (!hasAlternateLogo()) {
+			return null;
+		}
+		
+		File dir = getLogosDirectory();
+		File file = dir.listFiles()[0];
+		return BitmapFactory.decodeFile(file.getAbsolutePath());
 	}
 	
 	public void getAgencyWithId(final int id, final OnAgencyFetchListener l) {
