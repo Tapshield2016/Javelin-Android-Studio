@@ -332,50 +332,12 @@ public class JavelinUserManager {
 			
 			@Override
 			public void onEnd(JavelinCommsRequestResponse response) {
-				if (response.successful) {
-					User user = null;
-					try {
-						user = User.deserialize(response.jsonResponse.toString());
-					} catch (Exception e) {
-						l.onUserLogIn(false, null, CODE_ERROR_OTHER, new Throwable("Error reading incoming user data:" + e));
-						return;
-					}
-					
-					mUser = user;
-					user.setPassword(password);
-					setCache();
-					setCachePassword(password);
-					getApiTokenForLoggedUser(l);
-				} else {
-					clearCachePassword();
-					removeApiToken();
-					removeDeviceToken();
-
-					String message = new String();
-					if (response.code == 401) {
-						for (Header header : response.headers) {
-							if (header.getName().equals(HEADER_ERROR_NAME)) {
-								message = header.getValue();
-								break;
-							}
-						}
-						
-						if (message.equals(HEADER_ERROR_VALUE_CREDENTIALS)) {
-							l.onUserLogIn(false, null, CODE_ERROR_WRONG_CREDENTIALS, new Throwable(message));
-							return;
-						} else if (message.equals(HEADER_ERROR_VALUE_UNVERIFIED)) {
-							l.onUserLogIn(false, null, CODE_ERROR_UNVERIFIED_EMAIL, new Throwable(message));
-							return;
-						}
-						logIn(username, password, l);
-					} else if (response.code == 403) {
-						message = HEADER_ERROR_USER_INACTIVE;
-						l.onUserLogIn(false, null, CODE_ERROR_OTHER, new Throwable(message));
-						return;
-					}
-					message = HEADER_ERROR_OTHER;
-					l.onUserLogIn(false, null, CODE_ERROR_OTHER, new Throwable(message));
-				}
+				Log.i("javelin", "std login"
+						+ " code= "+ response.code
+						+ " ok=" + response.successful
+						+ " message=" + response.response.toString()
+						+ " error=" + (!response.successful ? response.exception.getMessage() : new String()));
+				processLoginCallback(username, password, response, l);
 			}
 		};
 		
@@ -393,8 +355,7 @@ public class JavelinUserManager {
 				callback);
 	}
 	
-	public void logInWithGooglePlus(String accessToken, String refreshToken,
-			final OnUserLogInListener l) {
+	public void logInWithGooglePlus(final String accessToken, final OnUserLogInListener l) {
 		
 		JavelinCommsCallback callback = new JavelinCommsCallback() {
 			
@@ -405,68 +366,115 @@ public class JavelinUserManager {
 						+ " ok=" + response.successful
 						+ " message=" + response.response.toString()
 						+ " error=" + (!response.successful ? response.exception.getMessage() : new String()));
-				if (response.successful) {
-					User user = null;
-					try {
-						user = User.deserialize(response.jsonResponse.toString());
-					} catch (Exception e) {
-						l.onUserLogIn(false, null, CODE_ERROR_OTHER, new Throwable("Error reading incoming user data:" + e));
-						return;
-					}
-					
-					mUser = user;
-					//user.setPassword(password);
-					setCache();
-					//setCachePassword(password);
-					getApiTokenForLoggedUser(l);
-				} else {
-					clearCachePassword();
-					removeApiToken();
-					removeDeviceToken();
-
-					String message = new String();
-					if (response.code == 401) {
-						for (Header header : response.headers) {
-							if (header.getName().equals(HEADER_ERROR_NAME)) {
-								message = header.getValue();
-								break;
-							}
-						}
-						
-						if (message.equals(HEADER_ERROR_VALUE_CREDENTIALS)) {
-							l.onUserLogIn(false, null, CODE_ERROR_WRONG_CREDENTIALS, new Throwable(message));
-							return;
-						} else if (message.equals(HEADER_ERROR_VALUE_UNVERIFIED)) {
-							l.onUserLogIn(false, null, CODE_ERROR_UNVERIFIED_EMAIL, new Throwable(message));
-							return;
-						}
-					} else if (response.code == 403) {
-						message = HEADER_ERROR_USER_INACTIVE;
-						l.onUserLogIn(false, null, CODE_ERROR_OTHER, new Throwable(message));
-						return;
-					}
-					message = HEADER_ERROR_OTHER;
-					l.onUserLogIn(false, null, CODE_ERROR_OTHER, new Throwable(message));
-				}
+				processLoginCallback(null, accessToken, response, l);
 			}
 		};
 		
 		List<NameValuePair> params = new ArrayList<NameValuePair>();
 		params.add(new BasicNameValuePair(JavelinClient.PARAM_ACCESS_TOKEN, accessToken));
-		params.add(new BasicNameValuePair(JavelinClient.PARAM_REFRESH_TOKEN, refreshToken));
-		
-		Log.i("javelin", "url=" + JavelinUtils.buildFinalUrl(mConfig,
-				JavelinClient.URL_LOGIN_SOCIAL_GOOGLE_PLUS));
-		Log.i("javelin", "master token=" + mConfig.getMasterToken());
-		Log.i("javelin", "g+ params=" + params.toString());
 		
 		JavelinComms.httpPost(
-				JavelinUtils.buildFinalUrl(mConfig,
-				JavelinClient.URL_LOGIN_SOCIAL_GOOGLE_PLUS),
+				JavelinUtils.buildFinalUrl(mConfig, JavelinClient.URL_LOGIN_SOCIAL_GOOGLE_PLUS),
 				JavelinClient.HEADER_AUTH,
 				JavelinClient.HEADER_VALUE_TOKEN_PREFIX + mConfig.getMasterToken(),
 				params,
 				callback);
+	}
+	
+	public void logInWithFacebook(final String accessToken, final OnUserLogInListener l) {
+		
+		JavelinCommsCallback callback = new JavelinComms.JavelinCommsCallback() {
+			
+			@Override
+			public void onEnd(JavelinCommsRequestResponse response) {
+				Log.i("javelin", "facebook login"
+						+ " code= "+ response.code
+						+ " ok=" + response.successful
+						+ " message=" + response.response.toString()
+						+ " error=" + (!response.successful ? response.exception.getMessage() : new String()));
+				processLoginCallback(null, accessToken, response, l);
+			}
+		};
+		
+		List<NameValuePair> params = new ArrayList<NameValuePair>();
+		params.add(new BasicNameValuePair(JavelinClient.PARAM_ACCESS_TOKEN, accessToken));
+		
+		JavelinComms.httpPost(
+				JavelinUtils.buildFinalUrl(mConfig, JavelinClient.URL_LOGIN_SOCIAL_FACEBOOK),
+				JavelinClient.HEADER_AUTH,
+				JavelinClient.HEADER_VALUE_TOKEN_PREFIX + mConfig.getMasterToken(),
+				params,
+				callback);
+	}
+	
+	private void processLoginCallback(final String username, final String password,
+			final JavelinCommsRequestResponse response, final OnUserLogInListener l) {
+		
+		if (response.successful) {
+			User user = null;
+			try {
+				user = User.deserialize(response.jsonResponse.toString());
+			} catch (Exception e) {
+				l.onUserLogIn(false, null, CODE_ERROR_OTHER, new Throwable("Error reading incoming user data:" + e));
+				return;
+			}
+			
+			mUser = user;
+			user.setPassword(password);
+			setCache();
+			setCachePassword(password);
+			
+			try {
+				String token = response.jsonResponse.getString(JavelinClient.PARAM_TOKEN);
+				enableGCM();
+				Log.i("javelin", "API token=" + token);
+				Log.i("javelin", "API token: setting apitoken and enabling gcm...");
+				setApiToken(token);
+				enableGCM();
+				l.onUserLogIn(true, getUser(), CODE_OK, null);
+			} catch (Exception e) {
+				Log.e("javelin", "Error obtaining token", e);
+				
+				//notify current method with error flag to have ELSE (error) block handle it
+				response.successful = false;
+				response.exception = new Exception("Error obtaining/setting token/gcm: " + e.getMessage());
+				processLoginCallback(null, null, response, l);
+			}
+		} else {
+			clearCachePassword();
+			removeApiToken();
+			removeDeviceToken();
+
+			String message = new String();
+			if (response.code == 401) {
+				for (Header header : response.headers) {
+					if (header.getName().equals(HEADER_ERROR_NAME)) {
+						message = header.getValue();
+						break;
+					}
+				}
+				
+				if (message.equals(HEADER_ERROR_VALUE_CREDENTIALS)) {
+					l.onUserLogIn(false, null, CODE_ERROR_WRONG_CREDENTIALS, new Throwable(message));
+					return;
+				} else if (message.equals(HEADER_ERROR_VALUE_UNVERIFIED)) {
+					l.onUserLogIn(false, null, CODE_ERROR_UNVERIFIED_EMAIL, new Throwable(message));
+					return;
+				}
+				
+				//retry if another random error with available login info
+				if (username != null && !username.isEmpty()
+						&& password != null && !password.isEmpty()) {
+					logIn(username, password, l);
+				}
+			} else if (response.code == 403) {
+				message = HEADER_ERROR_USER_INACTIVE;
+				l.onUserLogIn(false, null, CODE_ERROR_OTHER, new Throwable(message));
+				return;
+			}
+			message = HEADER_ERROR_OTHER;
+			l.onUserLogIn(false, null, CODE_ERROR_OTHER, new Throwable(message));
+		}
 	}
 	
 	public void updateRequiredInformation(final OnUserRequiredInformationUpdateListener l) {
@@ -729,6 +737,8 @@ public class JavelinUserManager {
 		if (hasCachePassword()) {
 			params.add(new BasicNameValuePair(JavelinClient.PARAM_PASSWORD, getCachePassword()));
 		}
+		
+		Log.i("javelin", "user api token retrieval params=" + params);
 		
 		JavelinComms.httpPost(
 				JavelinUtils.buildFinalUrl(mConfig, JavelinClient.URL_TOKEN_RETRIEVAL),
