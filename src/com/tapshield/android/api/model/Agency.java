@@ -167,14 +167,16 @@ public class Agency {
 			o.put(KEY_CENTER_LATITUDE, a.centerLatitude);
 			o.put(KEY_CENTER_LONGITUDE, a.centerLongitude);
 			
-			JSONArray list = new JSONArray();
-			for (String coordinates : a.boundaries) {
-				list.put(coordinates);
-			}
-			
-			if (list.length() > 0) {
-				o.put(KEY_BOUNDARIES, list.toString());
-				Log.d("javelin", "plugged boundaries=" + list.toString());
+			if (a.boundaries != null) {
+				JSONArray list = new JSONArray();
+				for (String coordinates : a.boundaries) {
+					list.put(coordinates);
+				}
+				
+				if (list.length() > 0) {
+					o.put(KEY_BOUNDARIES, list.toString());
+					Log.d("javelin", "plugged boundaries=" + list.toString());
+				}
 			}
 			
 			//additions for multiple geofences and dispatch centers
