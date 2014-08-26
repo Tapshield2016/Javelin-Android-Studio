@@ -1,10 +1,16 @@
 package com.tapshield.android.api.model;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import android.util.Log;
 
+import com.google.gson.Gson;
+import com.google.gson.annotations.SerializedName;
 import com.tapshield.android.api.JavelinUtils;
 
 public class User {
@@ -20,9 +26,10 @@ public class User {
 	private static final String KEY_DISARM_CODE = "disarm_code";
 	private static final String KEY_PASSWORD = "password";
 	private static final String KEY_PHONE_NUMBER_VERIFIED = "phone_number_verified";
+	private static final String KEY_SECONDARY_EMAILS = "secondary_emails";
 	
-	public int
-			id;
+	public int id;
+	
 	public String
 			url,
 			username,
@@ -30,9 +37,13 @@ public class User {
 			firstName,
 			lastName,
 			phoneNumber;
+	
+	public Emails allEmails;
+	
 	private String
 			disarmCode,
 			password;
+	
 	private boolean
 			phoneNumberVerified = false;
 	
@@ -103,6 +114,8 @@ public class User {
 		o.put(KEY_PHONE_NUMBER, u.phoneNumber);
 		o.put(KEY_DISARM_CODE, u.disarmCode);
 		o.put(KEY_PHONE_NUMBER_VERIFIED, u.phoneNumberVerified);
+		
+		
 
 		if (u.password != null && u.password.trim().length() > 0)	o.put(KEY_PASSWORD, u.password);
 		
@@ -132,6 +145,12 @@ public class User {
 		u.id = JavelinUtils.extractLastIntOfString(u.url);
 		u.username = o.getString(KEY_USERNAME);
 		u.email = o.getString(KEY_EMAIL);
+
+		Gson gson = new Gson();
+		
+		if (o.has(KEY_SECONDARY_EMAILS) && !o.isNull(KEY_SECONDARY_EMAILS)) {
+			u.allEmails = gson.fromJson(s, Emails.class);
+		}
 		
 		if (o.has(KEY_FIRST_NAME)) {
 			u.firstName = o.getString(KEY_FIRST_NAME);
@@ -157,5 +176,50 @@ public class User {
 		User u = deserialize(s);
 		u.agency = new Agency();
 		return u;
+	}
+	
+	public class Emails {
+		
+		@SerializedName("secondary_emails")
+		private List<Email> mEmails;
+		
+		public List<Email> getList() {
+			return mEmails;
+		}
+		
+		public boolean isEmpty() {
+			return mEmails.isEmpty();
+		}
+	}
+	
+	public class Email {
+		
+		@SerializedName("email")
+		private String mEmail;
+		
+		@SerializedName("is_primary")
+		private boolean mIsPrimary;
+		
+		@SerializedName("is_active")
+		private boolean mIsActive;
+		
+		@SerializedName("is_activation_sent")
+		private boolean mIsActivationSent;
+		
+		public String get() {
+			return mEmail;
+		}
+		
+		public boolean isPrimary() {
+			return mIsPrimary;
+		}
+		
+		public boolean isActive() {
+			return mIsActive;
+		}
+		
+		public boolean isActivationEmailSent() {
+			return mIsActivationSent;
+		}
 	}
 }
