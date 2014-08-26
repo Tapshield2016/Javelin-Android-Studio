@@ -56,6 +56,7 @@ public class JavelinClient {
 	static final String URL_RESET_PASSWORD_SUFFIX = "accounts/password/reset/";
 	
 	static final String URL_LOGIN_SOCIAL_GOOGLE_PLUS = URL_API + "create-google-user/";
+	static final String URL_LOGIN_SOCIAL_FACEBOOK = URL_API + "create-facebook-user/";
 	
 	static final String HEADER_AUTH = "Authorization";
 	static final String HEADER_VALUE_TOKEN_PREFIX = "Token ";
