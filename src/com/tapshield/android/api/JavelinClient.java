@@ -58,6 +58,13 @@ public class JavelinClient {
 	static final String URL_LOGIN_SOCIAL_GOOGLE_PLUS = URL_API + "create-google-user/";
 	static final String URL_LOGIN_SOCIAL_FACEBOOK = URL_API + "create-facebook-user/";
 	
+	static final String URL_EMAILS = URL_API + "email/";
+	static final String URL_EMAILS_ADD = URL_EMAILS + "add/";
+	static final String URL_EMAILS_DELETE = URL_EMAILS + "delete/";
+	static final String URL_EMAILS_SEND_ACTIVATION = URL_EMAILS + "send_activation/";
+	static final String URL_EMAILS_MAKE_PRIMARY = URL_EMAILS + "make_primary/";
+	static final String URL_EMAILS_CHECK_ACTIVATED = URL_EMAILS + "check_activated/";
+	
 	static final String HEADER_AUTH = "Authorization";
 	static final String HEADER_VALUE_TOKEN_PREFIX = "Token ";
 	
