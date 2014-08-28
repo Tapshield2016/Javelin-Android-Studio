@@ -1,6 +1,5 @@
 package com.tapshield.android.api.model;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.json.JSONArray;
@@ -74,6 +73,10 @@ public class User {
 		return this.password.equals(attemptedPassword);
 	}
 	
+	public boolean hasDisarmCode() {
+		return this.disarmCode != null && !this.disarmCode.isEmpty();
+	}
+	
 	public void setDisarmCode(String disarmCode) {
 		this.disarmCode = disarmCode;
 	}
@@ -115,7 +118,10 @@ public class User {
 		o.put(KEY_DISARM_CODE, u.disarmCode);
 		o.put(KEY_PHONE_NUMBER_VERIFIED, u.phoneNumberVerified);
 		
-		
+		Gson gson = new Gson();
+		if (u.allEmails != null) {
+			o.put(KEY_SECONDARY_EMAILS, new JSONArray(gson.toJson(u.allEmails)));
+		}
 
 		if (u.password != null && u.password.trim().length() > 0)	o.put(KEY_PASSWORD, u.password);
 		
@@ -164,7 +170,10 @@ public class User {
 			u.phoneNumber = o.getString(KEY_PHONE_NUMBER);
 		}
 		
-		u.disarmCode = o.getString(KEY_DISARM_CODE);
+		if (o.has(KEY_DISARM_CODE)) {
+			u.disarmCode = o.getString(KEY_DISARM_CODE);
+		}
+		
 		u.phoneNumberVerified = o.getBoolean(KEY_PHONE_NUMBER_VERIFIED);
 		
 		if (o.has(KEY_PASSWORD)) u.password = o.getString(KEY_PASSWORD);
