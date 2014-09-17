@@ -119,8 +119,14 @@ public class User {
 		o.put(KEY_PHONE_NUMBER_VERIFIED, u.phoneNumberVerified);
 		
 		Gson gson = new Gson();
-		if (u.allEmails != null) {
-			o.put(KEY_SECONDARY_EMAILS, new JSONArray(gson.toJson(u.allEmails)));
+		if (u.allEmails != null && u.allEmails.getList() != null) {
+			JSONArray emails = new JSONArray();
+			
+			for (Email email : u.allEmails.getList()) {
+				emails.put(new JSONObject(gson.toJson(email)));
+			}
+			
+			o.put(KEY_SECONDARY_EMAILS, emails);
 		}
 
 		if (u.password != null && u.password.trim().length() > 0)	o.put(KEY_PASSWORD, u.password);
@@ -135,7 +141,8 @@ public class User {
 		
 		User u = new User();
 		
-		if(o.has(KEY_AGENCY) && !o.isNull(KEY_AGENCY)) {
+		//JSONObject.opt...() methods return the value if found and of that type
+		if(o.optJSONObject(KEY_AGENCY) != null) {
 			u.agency = Agency.deserializeFromJson(o.getJSONObject(KEY_AGENCY));
 		}
 		
@@ -170,7 +177,9 @@ public class User {
 			u.phoneNumber = o.getString(KEY_PHONE_NUMBER);
 		}
 		
-		if (o.has(KEY_DISARM_CODE)) {
+		if (!o.isNull(KEY_DISARM_CODE)
+				&& o.optString(KEY_DISARM_CODE) != null
+				&& !o.optString(KEY_DISARM_CODE).isEmpty()) {
 			u.disarmCode = o.getString(KEY_DISARM_CODE);
 		}
 		

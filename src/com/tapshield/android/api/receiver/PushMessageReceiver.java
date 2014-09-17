@@ -9,7 +9,6 @@ import android.util.Log;
 import com.tapshield.android.api.JavelinAlertManager;
 import com.tapshield.android.api.JavelinChatManager;
 import com.tapshield.android.api.JavelinClient;
-import com.tapshield.android.api.JavelinConfig;
 import com.tapshield.android.api.JavelinMassAlertManager;
 import com.tapshield.android.api.JavelinUserManager;
 

@@ -144,6 +144,10 @@ public class Agency {
 	}
 	
 	public static final JSONObject serializeToJson(Agency a) {
+		if (a == null) {
+			return null;
+		}
+		
 		JSONObject o = new JSONObject();
 		try {
 			o.put(KEY_URL, a.url);
@@ -259,11 +263,19 @@ public class Agency {
 			a.centerLongitude = o.getDouble(KEY_CENTER_LONGITUDE);
 			
 			if (!o.isNull(KEY_INFO_URL)) {
-				a.infoUrl = o.getString(KEY_INFO_URL);
+				
+				final String infoUrl = o.getString(KEY_INFO_URL);
+				if (!infoUrl.isEmpty()) {
+					a.infoUrl = infoUrl;
+				}
 			}
 			
 			if (!o.isNull(KEY_RSS_URL)) {
-				a.rssUrl = o.getString(KEY_RSS_URL);
+				
+				final String rssUrl = o.getString(KEY_RSS_URL);
+				if (!rssUrl.isEmpty()) {
+					a.rssUrl = rssUrl;
+				}
 			}
 			
 			List<String> boundaries = new ArrayList<String>();

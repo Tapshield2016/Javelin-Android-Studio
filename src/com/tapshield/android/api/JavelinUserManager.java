@@ -32,10 +32,19 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.google.android.gms.gcm.GoogleCloudMessaging;
+import com.squareup.okhttp.Call;
+import com.squareup.okhttp.Callback;
+import com.squareup.okhttp.FormEncodingBuilder;
+import com.squareup.okhttp.OkHttpClient;
+import com.squareup.okhttp.Request;
+import com.squareup.okhttp.RequestBody;
+import com.squareup.okhttp.Response;
 import com.tapshield.android.api.JavelinComms.JavelinCommsCallback;
 import com.tapshield.android.api.JavelinComms.JavelinCommsRequestResponse;
 import com.tapshield.android.api.model.Agency;
 import com.tapshield.android.api.model.User;
+import com.tapshield.android.api.model.User.Email;
+import com.tapshield.android.api.model.User.Emails;
 import com.tapshield.android.api.model.UserProfile;
 
 public class JavelinUserManager {
@@ -74,6 +83,7 @@ public class JavelinUserManager {
 	private Status mStatus;
 	private User mUser;
 	private String mTempPassword;
+	private Agency mTempAgency;
 	
 	static JavelinUserManager getInstance(Context context, JavelinConfig config) {
 		if (mInstance == null) {
@@ -229,7 +239,31 @@ public class JavelinUserManager {
 		return mUser;
 	}
 	
+	public boolean hasTemporaryAgency() {
+		return mTempAgency != null;
+	}
 	
+	public void clearTemporaryAgency() {
+		mTempAgency = null;
+	}
+	
+	public Agency getTemporaryAgency() {
+		return mTempAgency;
+	}
+	
+	public void setTemporaryAgency(Agency agency) {
+		mTempAgency = agency;
+	}
+	
+	public void setTemporaryAgencyAsMain() {
+		User user = getUser();
+		user.agency = getTemporaryAgency();
+		setUser(user);
+	}
+	
+	public void signUp(final String email, final String password, final OnUserSignUpListener l) {
+		signUp(null, email, password, null, null, null, null, l);
+	}
 	
 	public void signUp(final Agency agency, final String email, final String password, final String phoneNumber, 
 			final String disarmCode, final String firstName, final String lastName, final OnUserSignUpListener l) {
@@ -300,7 +334,10 @@ public class JavelinUserManager {
 		params.add(new BasicNameValuePair(JavelinClient.PARAM_USERNAME, email));
 		params.add(new BasicNameValuePair(JavelinClient.PARAM_EMAIL, email));
 		params.add(new BasicNameValuePair(JavelinClient.PARAM_PASSWORD, password));
-		params.add(new BasicNameValuePair(JavelinClient.PARAM_CODE, disarmCode));
+		
+		if (disarmCode != null) {
+			params.add(new BasicNameValuePair(JavelinClient.PARAM_CODE, disarmCode));
+		}
 
 		if (phoneNumber != null && phoneNumber.length() > 0) {
 			params.add(new BasicNameValuePair(JavelinClient.PARAM_PHONE, phoneNumber));
@@ -486,12 +523,13 @@ public class JavelinUserManager {
 			
 			@Override
 			public void onEnd(JavelinCommsRequestResponse response) {
-				if (response.successful) {
-					l.onUserRequiredInformationUpdate(response.successful, null);
-				} else {
-					l.onUserRequiredInformationUpdate(response.successful,
-								new Exception("Error updating required information in the back-end."
-										+ response.exception.getMessage()));
+				if (l != null) {
+					Throwable t =
+							response.successful
+							? null
+							: new Exception("Error updating required information in the back-end."
+									+ response.exception.getMessage());
+					l.onUserRequiredInformationUpdate(response.successful, t);
 				}
 			}
 		};
@@ -666,36 +704,34 @@ public class JavelinUserManager {
 		if (!getUser().profile.hasUrl()) {
 			return;
 		}
+		
+		final String url = getUser().profile.getUrl();
+		
+		OkHttpClient client = new OkHttpClient();
+		
+		RequestBody body = new FormEncodingBuilder()
+				.add("profile_image_url", getUser().profile.getPictureUrl())
+				.build();
 
-		JavelinCommsCallback callback = new JavelinCommsCallback() {
-
+		Request request = new Request.Builder()
+				.url(url)
+				.patch(body)
+				.addHeader(JavelinClient.HEADER_AUTH, JavelinClient.HEADER_VALUE_TOKEN_PREFIX + getApiToken())
+				.build();
+		
+		Call call = client.newCall(request);
+		call.enqueue(new Callback() {
+			
 			@Override
-			public void onEnd(JavelinCommsRequestResponse response) {
-				if (response.successful) {
-					l.onUserProfileUpload(response.successful, getUser().profile, null);
-				} else {
-					l.onUserProfileUpload(response.successful, null, response.exception);
-				}
+			public void onResponse(Response response) throws IOException {
+				l.onUserProfileUpload(true, getUser().profile, null);
 			}
-		};
-
-		String url = getUser().profile.getUrl();
-
-		List<NameValuePair> params = new ArrayList<NameValuePair>();
-		params.add(new BasicNameValuePair("profile_image_url", getUser().profile.getPictureUrl()));
-
-		Log.d("javelin", "notifyBackend");
-		Log.d("javelin", "  url=" + url);
-		Log.d("javelin", "  " + params.get(0).getName() + "=" + params.get(0).getValue());
-
-		JavelinComms.httpPatch(
-				url,
-				JavelinClient.HEADER_AUTH,
-				JavelinClient.HEADER_VALUE_TOKEN_PREFIX + getApiToken(),
-				params,
-				callback);
-
-		//uploadUserInformation(l);
+			
+			@Override
+			public void onFailure(Request response, IOException e) {
+				l.onUserProfileUpload(false, null, e);
+			}
+		});
 	}
 	
 	private void getApiTokenForLoggedUser(final OnUserLogInListener l) {
@@ -985,6 +1021,21 @@ public class JavelinUserManager {
 				callback);
 	}
 	
+	public void removeUserFromOrganization() {
+		if (!isPresent()) {
+			return;
+		}
+		
+		if (getUser().agency == null) {
+			return;
+		}
+		
+		User user = getUser();
+		user.agency = null;
+		setUser(user);
+		//NEEDS VALUE FOR NOTIFYING THE SERVER--NULL IS IGNORED WHEN INCLUDED IN NET REQUEST PARAMS
+	}
+	
 	public void enableGCM() {
 		boolean loggedIn = isPresent();
 		
@@ -1018,21 +1069,14 @@ public class JavelinUserManager {
 					return null;
 				}
 				
-				if (hasDeviceToken() && token.equals(getDeviceToken())) {
-					Log.i("javelin", "gcm: same token=stop");
-					return null;
-				}
-
-				Log.i("javelin", "gcm: different token");
 				setDeviceToken(token);
 				Log.i("javelin", "gcm: stored device token=" + token);
 				return token;
 			}
 			
 			protected void onPostExecute(String token) {
-				if (token == null) {
-					return;
-				}
+				
+				//at least the device type will be updated
 				
 				JavelinCommsCallback callback = new JavelinCommsCallback() {
 					
@@ -1053,8 +1097,12 @@ public class JavelinUserManager {
 				Log.i("javelin", "gcm: user (" + user.id + ") obtained:" + user.toString());
 				
 				List<NameValuePair> params = new ArrayList<NameValuePair>();
-				params.add(new BasicNameValuePair(JavelinClient.PARAM_TOKEN_DEVICE, token));
 				params.add(new BasicNameValuePair(JavelinClient.PARAM_DEVICE, JavelinClient.DEVICE_ANDROID));
+				
+				//add new token if not null
+				if (token != null) {
+					params.add(new BasicNameValuePair(JavelinClient.PARAM_TOKEN_DEVICE, token));
+				}
 				
 				JavelinComms.httpPost(
 						JavelinUtils.buildFinalDeviceTokenUrl(user),
@@ -1166,6 +1214,165 @@ public class JavelinUserManager {
 		return response;
 	}
 	
+	public void addEmail(String newEmail, final UserEmailsListener l) {
+		if (!isPresent()) {
+			l.onEmailAdded(false, "User not present.");
+			return;
+		}
+		
+		if (newEmail == null || newEmail.isEmpty()) {
+			l.onEmailAdded(false, "Email invalid.");
+			return;
+		}
+		
+		newEmail = newEmail.trim();
+		
+		User user = getUser();
+		
+		//return if it's already part of current emails
+		for (Email email : user.allEmails.getList()) {
+			if (email.get().trim().equals(newEmail)) {
+				l.onEmailAdded(false, "Already registered.");
+				return;
+			}
+		}
+		
+		JavelinCommsCallback callback = new JavelinCommsCallback() {
+			
+			@Override
+			public void onEnd(JavelinCommsRequestResponse response) {
+				
+				String extra = null;
+				
+				if (response.successful) {
+					
+					updateUserEmailsLocal(response.response);
+					
+				} else {
+					try {
+						extra = response.jsonResponse.getString("message");
+					} catch (Exception e) {
+						extra = e.getMessage();
+					}
+				}
+				
+				l.onEmailAdded(response.successful, extra);
+			}
+		};
+		
+		List<NameValuePair> params = new ArrayList<NameValuePair>();
+		params.add(new BasicNameValuePair(JavelinClient.PARAM_EMAIL, newEmail));
+		
+		JavelinComms.httpPost(
+				JavelinUtils.buildFinalUrl(mConfig, JavelinClient.URL_EMAILS_ADD),
+				JavelinClient.HEADER_AUTH,
+				JavelinClient.HEADER_VALUE_TOKEN_PREFIX + getApiToken(),
+				params,
+				callback);
+	}
+
+	public void sendEmailActivation(String email, final UserEmailsListener l) {
+		if (!isPresent()) {
+			l.onEmailActivationRequested(false, "User not present.");
+			return;
+		}
+		
+		if (email == null || email.isEmpty()) {
+			l.onEmailActivationRequested(false, "Email invalid.");
+			return;
+		}
+		
+		JavelinCommsCallback callback = new JavelinCommsCallback() {
+			
+			@Override
+			public void onEnd(JavelinCommsRequestResponse response) {
+				
+				String extra = null;
+				if (!response.successful) {
+					try {
+						extra = response.jsonResponse.getString("message");
+					} catch (Exception e) {
+						extra = e.getMessage();
+					}
+				}
+				
+				l.onEmailActivationRequested(response.successful, extra);
+			}
+		};
+		
+		List<NameValuePair> params = new ArrayList<NameValuePair>();
+		params.add(new BasicNameValuePair(JavelinClient.PARAM_EMAIL, email));
+		
+		JavelinComms.httpPost(
+				JavelinUtils.buildFinalUrl(mConfig, JavelinClient.URL_EMAILS_SEND_ACTIVATION),
+				JavelinClient.HEADER_AUTH,
+				JavelinClient.HEADER_VALUE_TOKEN_PREFIX + getApiToken(),
+				params,
+				callback);
+	}
+	
+	public void checkEmailActivation(String email, final UserEmailsListener l) {
+		if (!isPresent()) {
+			l.onEmailActivationChecked(false, "User not present.");
+			return;
+		}
+		
+		if (email == null || email.isEmpty()) {
+			l.onEmailActivationChecked(false, "Email invalid.");
+			return;
+		}
+		
+		JavelinCommsCallback callback = new JavelinCommsCallback() {
+			
+			@Override
+			public void onEnd(JavelinCommsRequestResponse response) {
+				
+				Log.i("javelin", "emails check response=" + response.response);
+				
+				String extra = null;
+				if (response.successful) {
+					
+					updateUserEmailsLocal(response.response);
+					
+				} else {
+					try {
+						extra = response.jsonResponse.getString("message");
+					} catch (Exception e) {
+						extra = e.getMessage();
+					}
+				}
+				
+				l.onEmailActivationChecked(response.successful, extra);
+			}
+		};
+		
+		List<NameValuePair> params = new ArrayList<NameValuePair>();
+		params.add(new BasicNameValuePair(JavelinClient.PARAM_EMAIL, email));
+		
+		JavelinComms.httpGet(
+				JavelinUtils.buildFinalUrl(mConfig, JavelinClient.URL_EMAILS_CHECK_ACTIVATED),
+				JavelinClient.HEADER_AUTH,
+				JavelinClient.HEADER_VALUE_TOKEN_PREFIX + getApiToken(),
+				params,
+				callback);
+	}
+	
+	private void updateUserEmailsLocal(String jsonUserInformation) {
+		User user = getUser();
+		Emails newEmails = null;
+		try {
+			User userInfo = User.deserialize(jsonUserInformation);
+			newEmails = userInfo.allEmails;
+		} catch (Exception e) {
+			newEmails = null;
+		}
+		
+		if (newEmails != null) {
+			user.allEmails = newEmails;
+			setUser(user);
+		}
+	}
+	
 	public static interface OnUserLogInListener {
 		void onUserLogIn(boolean successful, User user, int errorCode, Throwable e);
 	}
@@ -1200,5 +1407,11 @@ public class JavelinUserManager {
 	
 	public static interface OnPhoneNumberVerificationSmsCodeVerifiedListener {
 		void onNewPhoneNumberVerificationSmsCodeVerified(boolean success, String reason);
+	}
+	
+	public static interface UserEmailsListener {
+		void onEmailAdded(boolean successful, String extra);
+		void onEmailActivationChecked(boolean successful, String extra);
+		void onEmailActivationRequested(boolean successful, String extra);
 	}
 }

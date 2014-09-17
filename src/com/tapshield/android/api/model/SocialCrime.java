@@ -26,6 +26,9 @@ public class SocialCrime {
 	@SerializedName("report_type")
 	private String mTypeCode;
 	
+	@SerializedName("reporter")
+	private String mReporter;
+	
 	@SerializedName("report_latitude")
 	private double mLatitude;
 	
@@ -40,6 +43,15 @@ public class SocialCrime {
 	
 	@SerializedName("report_video_url")
 	private String mReportVideo;
+	
+	@SerializedName("viewed_by")
+	private String mViewedBy;
+	
+	@SerializedName("viewed_time")
+	private String mViewedTime;
+	
+	@SerializedName("dispatcher_name")
+	private String mViewedByName;
 	
 	public String getUrl() {
 		return mUrl;
@@ -65,6 +77,10 @@ public class SocialCrime {
 		return mBody;
 	}
 	
+	public String getReporter() {
+		return mReporter;
+	}
+	
 	public double getLatitude() {
 		return mLatitude;
 	}
@@ -83,6 +99,18 @@ public class SocialCrime {
 	
 	public String getReportVideo() {
 		return mReportVideo;
+	}
+	
+	public boolean isViewed() {
+		return mViewedTime != null;
+	}
+	
+	public String getViewedBy() {
+		return mViewedBy;
+	}
+	
+	public String getViewedByName() {
+		return mViewedByName;
 	}
 	
 	public class SocialCrimes {

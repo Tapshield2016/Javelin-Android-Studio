@@ -20,8 +20,6 @@ import org.json.JSONObject;
 import android.net.Uri;
 import android.os.AsyncTask;
 
-import com.amazonaws.org.apache.http.client.methods.HttpPatch;
-
 public class JavelinComms {
 	
 	//put

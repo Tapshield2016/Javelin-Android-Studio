@@ -18,10 +18,15 @@ import com.tapshield.android.api.JavelinUtils;
 
 public class UserProfile {
 
+	public static final String ACTION_USER_PICTURE_UPDATED = "com.tapshield.android.action.USER_PICTURE_UPDATED";
+	
 	public static String REGEX_DOB = "\\d{4}/\\d{2}/\\d{2}";
 	public static String REGEX_1_OR_2_CAPITAL_LETTERS = "[A-Z]{1,2}";
 	public static String REGEX_HEIGHT = "\\d{1}'\\d{1,2}\"";
 	public static String REGEX_WEIGHT = "\\d{2,3}\\slbs.";
+	
+	public static final String GENDER_MALE = "Male";
+	public static final String GENDER_FEMALE = "Female";
 	
 	private static final int PICTURE_DIMENSION_MAX = 300;
 	
@@ -417,9 +422,9 @@ public class UserProfile {
 		}
 		if (hasGender()) {
 			String gender = getGender().trim();
-			if (gender.equals("Male")) {
+			if (gender.equals(GENDER_MALE)) {
 				gender = "M";
-			} else if (gender.equals("Female")) {
+			} else if (gender.equals(GENDER_FEMALE)) {
 				gender = "F";
 			}
 			params.add(new BasicNameValuePair(KEY_GENDER, gender));

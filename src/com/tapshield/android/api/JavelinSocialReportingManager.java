@@ -8,6 +8,7 @@ import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 
 import android.content.Context;
+import android.os.Bundle;
 import android.util.Log;
 
 import com.google.gson.Gson;
@@ -18,6 +19,8 @@ import com.tapshield.android.api.model.SocialCrime.SocialCrimes;
 
 public class JavelinSocialReportingManager {
 
+	public static final String KEY_PUSHMESSAGE_TITLE = "title";
+	
 	//commented out unsupported types
 	public static final String[] TYPE_LIST = new String[] {
 			"Abuse",
@@ -65,6 +68,7 @@ public class JavelinSocialReportingManager {
 	private static JavelinSocialReportingManager mInstance;
 	private Context mContext;
 	private JavelinConfig mConfig;
+	private List<SocialReportingMessageListener> mMessageListeners;
 	
 	static JavelinSocialReportingManager getInstance(Context context, JavelinConfig config) {
 		if (mInstance == null) {
@@ -76,6 +80,7 @@ public class JavelinSocialReportingManager {
 	private JavelinSocialReportingManager(Context context, JavelinConfig config) {
 		mContext = context.getApplicationContext();
 		mConfig = config;
+		mMessageListeners = new ArrayList<SocialReportingMessageListener>();
 	}
 	
 	public void report(final String body, final String reportTypeName,
@@ -148,8 +153,19 @@ public class JavelinSocialReportingManager {
 			@Override
 			public void onEnd(JavelinCommsRequestResponse response) {
 				
-				l.onDetails(response.successful, response.code,
-						new Gson().fromJson(response.response, SocialCrime.class),
+				if (l == null) {
+					return;
+				}
+				
+				SocialCrime socialCrime;
+				
+				try {
+					socialCrime = new Gson().fromJson(response.response, SocialCrime.class);
+				} catch (Exception e) {
+					socialCrime = null;
+				}
+				
+				l.onDetails(response.successful, response.code, socialCrime, 
 						response.exception.getMessage());
 			}
 		};
@@ -221,6 +237,36 @@ public class JavelinSocialReportingManager {
 				callback);
 	}
 	
+	public void deleteReport(final SocialCrime socialCrime, final SocialReportingListener l) {
+		if (socialCrime == null) {
+			return;
+		}
+		
+		JavelinCommsCallback callback = new JavelinCommsCallback() {
+			
+			@Override
+			public void onEnd(JavelinCommsRequestResponse response) {
+				if (l == null) {
+					return;
+				}
+				
+				l.onDelete(response.successful, response.code, socialCrime,
+						response.exception.getMessage());
+			}
+		};
+		
+		final String userToken = JavelinClient
+				.getInstance(mContext, mConfig)
+				.getUserManager()
+				.getApiToken();
+		
+		JavelinComms.httpDelete(
+				socialCrime.getUrl(),
+				JavelinClient.HEADER_AUTH,
+				JavelinClient.HEADER_VALUE_TOKEN_PREFIX + userToken,
+				callback);
+	}
+	
 	public static String getCodeByType(String type) {
 		String code = TYPE_CODES[0];
 		
@@ -253,9 +299,30 @@ public class JavelinSocialReportingManager {
 		return type;
 	}
 	
+	public void addMessageListener(SocialReportingMessageListener l) {
+		mMessageListeners.add(l);
+	}
+	
+	public void removeMessageListener(SocialReportingMessageListener l) {
+		mMessageListeners.remove(l);
+	}
+	
+	public void notifyMessage(final String message, final String id, final Bundle extras) {
+		for (SocialReportingMessageListener l : mMessageListeners) {
+			if (l != null) {
+				l.onMessageReceive(message, id, extras);
+			}
+		}
+	}
+	
 	public interface SocialReportingListener {
 		void onReport(boolean ok, int code, String errorIfNotOk);
 		void onFetch(boolean ok, int code, SocialCrimes socialCrimes, String errorIfNotOk);
 		void onDetails(boolean ok, int code, SocialCrime socialCrime, String errorIfNotOk);
+		void onDelete(boolean ok, int code, SocialCrime socialCrime, String errorIfNotOk);
+	}
+	
+	public interface SocialReportingMessageListener {
+		void onMessageReceive(String message, String id, Bundle extras);
 	}
 }
