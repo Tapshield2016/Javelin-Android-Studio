@@ -19,14 +19,14 @@ import android.os.AsyncTask;
 import android.util.Log;
 
 import com.amazonaws.Request;
+import com.amazonaws.Response;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.handlers.RequestHandler;
+import com.amazonaws.handlers.RequestHandler2;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.GetQueueUrlRequest;
 import com.amazonaws.services.sqs.model.GetQueueUrlResult;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
-import com.amazonaws.util.TimingInfo;
 import com.tapshield.android.api.JavelinComms.JavelinCommsCallback;
 import com.tapshield.android.api.JavelinComms.JavelinCommsRequestResponse;
 
@@ -39,10 +39,13 @@ public class JavelinAlertManager {
 	public static final int TYPE_START_REQUESTED = 3;
 	public static final int TYPE_HEADSET_UNPLUGGED = 4;
 	public static final int TYPE_CHAT = 5;
+	public static final int TYPE_911 = 6;
 	
 	private static final String PARAM_TYPE_EMERGENCY = "E";
 	private static final String PARAM_TYPE_CHAT = "C";
 	private static final String PARAM_TYPE_TIMER = "T";
+	private static final String PARAM_TYPE_911 = "N";
+	private static final String PARAM_TYPE_YANK = "Y";
 	
 	private static final String PARAM_USER = "user";
 	private static final String PARAM_ALERT_ID = "alert";
@@ -55,6 +58,7 @@ public class JavelinAlertManager {
 	private static final String PARAM_LATITUDE_UPDATE = "latitude";
 	private static final String PARAM_LONGITUDE_INIT = "location_longitude";
 	private static final String PARAM_LONGITUDE_UPDATE = "longitude";
+	private static final String PARAM_CALL_LENGTH = "call_length";
 	
 	private static final long DISARM_ATTEMPT_INTERVAL = 5000;
 	
@@ -100,19 +104,18 @@ public class JavelinAlertManager {
 			mAlertListener.onConnecting();
 		}
 
-		RequestHandler handler = new RequestHandler() {
+		RequestHandler2 handler = new RequestHandler2() {
 			
 			@Override
 			public void beforeRequest(Request<?> arg0) {}
 
-			//do not alert listener here since it is in aws queue, response must come from back-end
 			@Override
-			public void afterResponse(Request<?> arg0, Object arg1, TimingInfo arg2) {
+			public void afterResponse(Request<?> request, Response<?> response) {
 				Log.i("javelin", "Dispatcher alerted");
 			}
-			
+
 			@Override
-			public void afterError(Request<?> arg0, Exception e) {
+			public void afterError(Request<?> request, Response<?> response, Exception e) {
 				Log.e("javelin", "Error alerting dispatcher:" + e);
 				mStatus = Status.IDLE;
 				notifyListenerIfPresent(e);
@@ -170,6 +173,14 @@ public class JavelinAlertManager {
 		}
 	}
 	
+	public void notifyCompletion(String completedId) {
+		if (getId() != null && !getId().isEmpty()
+				&& completedId != null && !completedId.isEmpty()
+				&& matchesId(completedId)) {
+			notifyCompletion();
+		}
+	}
+	
 	public void notifyId(String id) {
 		Log.d("javelin", "Notifying of new ID via push. Is it running? " + isRunning());
 		mId = id;
@@ -191,6 +202,15 @@ public class JavelinAlertManager {
 		
 		notifyListenerIfPresent(null);
 		JavelinUserManager.getInstance(mContext, mConfig).uploadUserProfile();
+	}
+	
+	private boolean matchesId(String id) {
+		
+		if (!isRunning()) {
+			return false;
+		}
+		
+		return JavelinUtils.extractLastIntOfString(mId) == JavelinUtils.extractLastIntOfString(id);
 	}
 	
 	public void cancel() {
@@ -253,12 +273,44 @@ public class JavelinAlertManager {
 		return mStatus == Status.ESTABLISHED;
 	}
 	
+	public void setEmergencyCallDuration(final int seconds) {
+		if (!isEstablished() || getId() == null || getId().isEmpty() || seconds < 0) {
+			return;
+		}
+
+		JavelinCommsCallback callback = new JavelinCommsCallback() {
+
+			@Override
+			public void onEnd(JavelinCommsRequestResponse response) {
+				Log.i("javelin", "Call length notification " + response.response);
+				if (!response.successful) {
+					//setEmergencyCallDuration(seconds);
+				}
+			}
+		};
+
+		String url = JavelinUtils.buildFinalUrl(mConfig, getId());
+		String apiToken = JavelinUserManager.getInstance(mContext, mConfig).getApiToken();
+
+		Log.i("javelin", "About to notify at " + url + " about call length of " + seconds);
+		
+		List<NameValuePair> params = new ArrayList<NameValuePair>();
+		params.add(new BasicNameValuePair(PARAM_CALL_LENGTH, Integer.toString(seconds)));
+		
+		JavelinComms.httpPatch(
+				url,
+				JavelinClient.HEADER_AUTH,
+				JavelinClient.HEADER_VALUE_TOKEN_PREFIX + apiToken,
+				params,
+				callback);
+	}
+	
 	private class AwsSqsAlertAsync extends AsyncTask<Location, Void, Void> {
 
-		private RequestHandler mHandler; 
+		private RequestHandler2 mHandler; 
 		private String mType;
 		
-		public AwsSqsAlertAsync(RequestHandler handler) {
+		public AwsSqsAlertAsync(RequestHandler2 handler) {
 			mHandler = handler;
 		}
 		
@@ -323,20 +375,22 @@ public class JavelinAlertManager {
 	}
 	
 	private String getDiscreteType(int type) {
-         switch(type) {
-                 case TYPE_START_DELAYED:
-                         return PARAM_TYPE_EMERGENCY;
-                 case TYPE_START_REQUESTED:
-                         return PARAM_TYPE_EMERGENCY;
-                 case TYPE_TIMER_AUTO:
-                         return PARAM_TYPE_TIMER;
-                 case TYPE_TIMER_SLIDER:
-                         return PARAM_TYPE_EMERGENCY;
-                 case TYPE_CHAT:
-                         return PARAM_TYPE_CHAT;
-                 case TYPE_HEADSET_UNPLUGGED:
-                         return PARAM_TYPE_TIMER;
-         }
+		switch(type) {
+		case TYPE_START_DELAYED:
+			return PARAM_TYPE_EMERGENCY;
+		case TYPE_START_REQUESTED:
+			return PARAM_TYPE_EMERGENCY;
+		case TYPE_TIMER_AUTO:
+			return PARAM_TYPE_TIMER;
+		case TYPE_TIMER_SLIDER:
+			return PARAM_TYPE_EMERGENCY;
+		case TYPE_CHAT:
+			return PARAM_TYPE_CHAT;
+		case TYPE_HEADSET_UNPLUGGED:
+			return PARAM_TYPE_YANK;
+		case TYPE_911:
+			return PARAM_TYPE_911;
+		}
          return PARAM_TYPE_EMERGENCY;
 	}
 	

@@ -35,10 +35,17 @@ public class Agency {
 	private static String KEY_SHOW_AGENCY_NAME = "show_agency_name_in_app_navbar";
 	private static String KEY_INFO_URL = "agency_info_url";
 	private static String KEY_RSS_URL = "agency_rss_url";
+	private static String KEY_ALERT_MODE_NAME = "alert_mode_name";
 	private static String KEY_LOGO = "agency_logo";
 	private static String KEY_LOGO_ALTERNATE = "agency_alternate_logo";
 	private static String KEY_LOGO_SMALL = "agency_small_logo";
 	private static String KEY_THEME = "agency_theme";
+	private static String KEY_FEATURE_EMERGENCY_CALL = "emergency_call_available";
+	private static String KEY_FEATURE_ALERT = "alert_available";
+	private static String KEY_FEATURE_CHAT = "chat_available";
+	private static String KEY_FEATURE_YANK = "yank_available";
+	private static String KEY_FEATURE_ENTOURAGE = "entourage_available";
+	private static String KEY_FEATURE_MASS = "mass_alert_available";
 	
 	private static String KEY_LIST = "results";
 	
@@ -55,6 +62,7 @@ public class Agency {
 			completeMessage,
 			infoUrl,
 			rssUrl,
+			alertModeName,
 			logo,
 			logoAlternate,
 			logoSmall,
@@ -62,7 +70,13 @@ public class Agency {
 	public boolean
 			displayCommandAlert,
 			requiredDomainEmails,
-			showAgencyName = false;
+			showAgencyName = false,
+			featureEmergencyCall,
+			featureAlert,
+			featureChat,
+			featureYank,
+			featureEntourage,
+			featureMass;
 	public float
 			distance = Float.MAX_VALUE;
 	public double
@@ -164,12 +178,19 @@ public class Agency {
 			o.put(KEY_SHOW_AGENCY_NAME, a.showAgencyName);
 			o.put(KEY_INFO_URL, a.infoUrl);
 			o.put(KEY_RSS_URL, a.rssUrl);
+			o.put(KEY_ALERT_MODE_NAME, a.alertModeName);
 			o.put(KEY_LOGO, a.logo);
 			o.put(KEY_LOGO_ALTERNATE, a.logoAlternate);
 			o.put(KEY_LOGO_SMALL, a.logoSmall);
 			o.put(KEY_THEME, a.themeJsonString);
 			o.put(KEY_CENTER_LATITUDE, a.centerLatitude);
 			o.put(KEY_CENTER_LONGITUDE, a.centerLongitude);
+			o.put(KEY_FEATURE_EMERGENCY_CALL, a.featureEmergencyCall);
+			o.put(KEY_FEATURE_ALERT, a.featureAlert);
+			o.put(KEY_FEATURE_CHAT, a.featureChat);
+			o.put(KEY_FEATURE_YANK, a.featureYank);
+			o.put(KEY_FEATURE_ENTOURAGE, a.featureEntourage);
+			o.put(KEY_FEATURE_MASS, a.featureMass);
 			
 			if (a.boundaries != null) {
 				JSONArray list = new JSONArray();
@@ -261,6 +282,16 @@ public class Agency {
 			a.logoSmall = o.getString(KEY_LOGO_SMALL);
 			a.centerLatitude = o.getDouble(KEY_CENTER_LATITUDE);
 			a.centerLongitude = o.getDouble(KEY_CENTER_LONGITUDE);
+			a.featureEmergencyCall = o.getBoolean(KEY_FEATURE_EMERGENCY_CALL);
+			a.featureAlert = o.getBoolean(KEY_FEATURE_ALERT);
+			a.featureChat = o.getBoolean(KEY_FEATURE_CHAT);
+			a.featureYank = o.getBoolean(KEY_FEATURE_YANK);
+			a.featureEntourage = o.getBoolean(KEY_FEATURE_ENTOURAGE);
+			a.featureMass = o.getBoolean(KEY_FEATURE_MASS);
+
+			if (!o.isNull(KEY_ALERT_MODE_NAME)) {
+				a.alertModeName = o.getString(KEY_ALERT_MODE_NAME);
+			}
 			
 			if (!o.isNull(KEY_INFO_URL)) {
 				
